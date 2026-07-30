@@ -6,11 +6,11 @@ from tkinter import filedialog, messagebox, ttk
 import yt_dlp
 
 
-class YouTubeDownloaderApp:
+class SocialMediaDownloaderApp:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("YouTube Video Downloader")
+        self.root.title("YouTube & Instagram Downloader")
         self.root.geometry("520x360")
         self.root.resizable(False, False)
 
@@ -18,7 +18,7 @@ class YouTubeDownloaderApp:
         self.download_folder = tk.StringVar(
             value=os.path.join(os.path.expanduser("~"), "Downloads")
         )
-        self.quality_var = tk.StringVar(value="Video Terbaik (MP4)")
+        self.quality_var = tk.StringVar(value="Kualitas Terbaik")
 
         self.setup_ui()
 
@@ -30,25 +30,27 @@ class YouTubeDownloaderApp:
         # 1. Judul Aplikasi
         title_label = ttk.Label(
             main_frame,
-            text="YouTube Video Downloader",
-            font=("Helvetica", 16, "bold"),
+            text="YouTube & Instagram Downloader",
+            font=("Helvetica", 15, "bold"),
         )
         title_label.pack(pady=(0, 15))
 
-        # 2. Input Link YouTube
-        url_frame = ttk.LabelFrame(main_frame, text=" Link Video YouTube ", padding=10)
+        # 2. Input Link Video
+        url_frame = ttk.LabelFrame(
+            main_frame, text=" Link Video (YouTube / Instagram) ", padding=10
+        )
         url_frame.pack(fill=tk.X, pady=(0, 10))
 
         self.url_entry = ttk.Entry(url_frame, font=("Helvetica", 10))
         self.url_entry.pack(fill=tk.X)
         self.url_entry.insert(
-            0, "https://www.youtube.com/watch?v=..."
+            0, "Tempel link YouTube atau Instagram di sini..."
         )  # Placeholder
         self.url_entry.bind(
             "<FocusIn>",
             lambda e: (
                 self.url_entry.delete(0, tk.END)
-                if "youtube.com" in self.url_entry.get()
+                if "Tempel link" in self.url_entry.get()
                 else None
             ),
         )
@@ -57,7 +59,7 @@ class YouTubeDownloaderApp:
         opt_frame = ttk.Frame(main_frame)
         opt_frame.pack(fill=tk.X, pady=(0, 15))
 
-        # Pilihan Kualitas
+        # Pilihan Kualitas / Format
         ttk.Label(opt_frame, text="Format:").grid(
             row=0, column=0, sticky=tk.W, padx=(0, 5)
         )
@@ -65,13 +67,13 @@ class YouTubeDownloaderApp:
             opt_frame,
             textvariable=self.quality_var,
             state="readonly",
-            width=20,
+            width=22,
         )
         quality_cb["values"] = (
-            "Video Terbaik (MP4)",
+            "Kualitas Terbaik",
             "Audio Saja (MP3)",
-            "720p",
-            "480p",
+            "720p (Khusus YouTube)",
+            "480p (Khusus YouTube)",
         )
         quality_cb.grid(row=0, column=1, sticky=tk.W, pady=5)
 
@@ -121,7 +123,6 @@ class YouTubeDownloaderApp:
             if total_bytes > 0:
                 percentage = (downloaded / total_bytes) * 100
                 self.progress["value"] = percentage
-                filename = os.path.basename(d.get("filename", ""))
                 speed = d.get("_speed_str", "N/A")
                 self.status_label.config(
                     text=f"Mendownload: {percentage:.1f}% ({speed})"
@@ -133,52 +134,74 @@ class YouTubeDownloaderApp:
             self.status_label.config(text="Memproses/Menggabungkan file...")
 
     def start_download_thread(self):
-        # Jalankan di Thread terpisah agar UI tidak Not Responding / Freeze
+        # Thread terpisah agar UI tidak Not Responding / Freeze
         thread = threading.Thread(target=self.download_video, daemon=True)
         thread.start()
 
     def download_video(self):
         url = self.url_entry.get().strip()
 
-        if not url or "youtube.com" not in url and "youtu.be" not in url:
+        # Validasi domain terdukung
+        allowed_domains = ["youtube.com", "youtu.be", "instagram.com"]
+        if not url or not any(domain in url for domain in allowed_domains):
             messagebox.showerror(
-                "Error", "Masukkan URL video YouTube yang valid!"
+                "Error", "Masukkan URL valid dari YouTube atau Instagram!"
             )
             return
 
         self.btn_download.config(state=tk.DISABLED)
         self.progress["value"] = 0
-        self.status_label.config(text="Menghubungkan ke YouTube...")
+        self.status_label.config(text="Menghubungkan ke server...")
 
-        # Opsi format sesuai pilihan user
         selected_format = self.quality_var.get()
-        if selected_format == "Audio Saja (MP3)":
-            ydl_format = "bestaudio/best"
-            postprocessors = [
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": "mp3",
-                    "preferredquality": "192",
-                }
-            ]
-        elif selected_format == "720p":
-            ydl_format = "bestvideo[height<=720]+bestaudio/best[height<=720]"
-            postprocessors = []
-        elif selected_format == "480p":
-            ydl_format = "bestvideo[height<=480]+bestaudio/best[height<=480]"
-            postprocessors = []
+        postprocessors = []
+
+        # Penyesuaian format untuk YouTube vs Instagram
+        if "instagram.com" in url:
+            # Instagram fleksibel menggunakan format terbaik yang tersedia
+            if selected_format == "Audio Saja (MP3)":
+                ydl_format = "bestaudio/best"
+                postprocessors.append(
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }
+                )
+            else:
+                ydl_format = "best"
         else:
-            ydl_format = "bestvideo+bestaudio/best"
-            postprocessors = []
+            # Konfigurasi khusus YouTube
+            if selected_format == "Audio Saja (MP3)":
+                ydl_format = "bestaudio/best"
+                postprocessors.append(
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": "mp3",
+                        "preferredquality": "192",
+                    }
+                )
+            elif selected_format == "720p (Khusus YouTube)":
+                ydl_format = "bestvideo[height<=720]+bestaudio/best[height<=720]"
+            elif selected_format == "480p (Khusus YouTube)":
+                ydl_format = "bestvideo[height<=480]+bestaudio/best[height<=480]"
+            else:
+                ydl_format = "bestvideo+bestaudio/best"
 
         ydl_opts = {
             "format": ydl_format,
             "outtmpl": os.path.join(
-                self.download_folder.get(), "%(title)s.%(ext)s"
+                self.download_folder.get(), "%(title)s_%(id)s.%(ext)s"
             ),
             "progress_hooks": [self.progress_hook],
             "postprocessors": postprocessors,
             "quiet": True,
+            # User agent khusus untuk menghindari pemblokiran batas permintaan
+            "user_agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/115.0.0.0 Safari/537.36"
+            ),
         }
 
         try:
@@ -186,7 +209,7 @@ class YouTubeDownloaderApp:
                 ydl.download([url])
 
             messagebox.showinfo(
-                "Sukses", "Video/Audio berhasil diunduh!"
+                "Sukses", "Media dari YouTube/Instagram berhasil diunduh!"
             )
             self.status_label.config(text="Selesai!")
         except Exception as e:
@@ -198,5 +221,5 @@ class YouTubeDownloaderApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = YouTubeDownloaderApp(root)
+    app = SocialMediaDownloaderApp(root)
     root.mainloop()
